@@ -7,7 +7,7 @@ We use public models to visually analyze the layout, discard formulas and images
 ![image](./imgs/example.png)
 
 
-Resulted PDF will store combined 2 images: original page and translated.
+Resulted PDF will store combined images: original page and translated.
 
 Personally, it helps me to read books with a little support in difficult moments :)
 
