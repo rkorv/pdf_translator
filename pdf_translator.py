@@ -5,7 +5,6 @@ import fitz
 from tqdm import tqdm
 import numpy as np
 from PIL import Image
-import imageio
 import io
 import cv2
 
