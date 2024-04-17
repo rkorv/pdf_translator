@@ -48,8 +48,8 @@ pdf_path = "input.pdf"
 
 pdf_translator = PDFTranslator("es")
 
-translations = pdf_translator.translate_pdf(pdf_path)
-pdf_translator.save_to_pdf(pdf_path, translations, "output.pdf")
+doc, translations = pdf_translator.translate_pdf(pdf_path)
+pdf_translator.save_to_pdf(doc, translations, "output.pdf")
 ```
 
 

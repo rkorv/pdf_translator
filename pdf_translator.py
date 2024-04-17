@@ -1,4 +1,4 @@
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Tuple
 import os
 
 import fitz
@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 import io
 import cv2
+import requests
 
 from src.utils import (
     parse_page,
@@ -55,12 +56,12 @@ class PDFTranslator:
 
         assert (
             language in self.SUPPORTED_LANGUAGES
-        ), f"Language {language} is not supported. Use one of {self.SUPPORTED_LANGUAGES}"
+        ), f"Language '{language}' is not supported. Use one of {self.SUPPORTED_LANGUAGES}"
         assert model in [
             "madlad400",
             "nllb200",
             "opusmt",
-        ], f"Model {model} is not supported. Use one of ['madlad400', 'nllb200', 'opusmt']"
+        ], f"Model '{model}' is not supported. Use one of ['madlad400', 'nllb200', 'opusmt']"
 
         if model == "madlad400":
             from src.translators.madlad400 import MADLAD400Translator
@@ -93,13 +94,16 @@ class PDFTranslator:
         pdf: Union[str, bytes],
         show_progress: bool = True,
         pages: List[int] = None,
-    ) -> Dict:
+    ) -> Tuple[fitz.Document, Dict]:
         """
         Args:
-            pdf (Union[str, bytes]): Path to PDF file or PDF bytes.
+            pdf (Union[str, bytes]): Path to PDF file or PDF bytes or link (f.e. 'https://arxiv.org/pdf/2310.06825.pdf').
             show_progress (bool): Whether to show processing progress bar.
             pages (List[int]): List of pages to translate. If None, translate all pages.
         """
+
+        if isinstance(pdf, str) and (pdf.startswith("http://") or pdf.startswith("https://")):
+            pdf = requests.get(pdf).content
 
         if isinstance(pdf, str):
             doc = fitz.open(pdf)
@@ -172,7 +176,7 @@ class PDFTranslator:
             if page:
                 pages_data[page_id] = page
 
-        return pages_data
+        return doc, pages_data
 
     def _draw_one_page_fitz(
         self,
@@ -215,33 +219,23 @@ class PDFTranslator:
 
     def draw_one_page(
         self,
-        pdf: Union[str, io.BytesIO],
+        doc: fitz.Document,
         data: dict,
         page_num: int,
         draw_rects: bool = False,
         scale: float = 2.5,
     ) -> np.ndarray:
-        if isinstance(pdf, str):
-            doc = fitz.open(pdf)
-        else:
-            doc = fitz.open(stream=pdf.read(), filetype="pdf")
-
         return self._draw_one_page_fitz(doc, data, page_num, draw_rects, scale)
 
     def save_to_pdf(
         self,
-        pdf: Union[str, io.BytesIO],
+        doc: fitz.Document,
         data: dict,
         save_to: str,
         show_progress: bool = True,
         scale: float = 2.5,
         jpeg_quality: int = 99,
-    ):
-        if isinstance(pdf, str):
-            doc = fitz.open(pdf)
-        else:
-            doc = fitz.open(stream=pdf.read(), filetype="pdf")
-
+    ) -> None:
         new_doc = fitz.open()
         pages = range(doc.page_count)
         if show_progress:
@@ -269,7 +263,9 @@ def get_arg_parser():
     import argparse
 
     parser = argparse.ArgumentParser(description="Translate PDF document")
-    parser.add_argument("pdf_path", type=str, help="Path to PDF file")
+    parser.add_argument(
+        "pdf", type=str, help="Path to PDF file or link to PDF file (f.e. 'https://arxiv.org/pdf/2310.06825.pdf')"
+    )
     parser.add_argument(
         "language", type=str, help=f"Target language for translation: {PDFTranslator.SUPPORTED_LANGUAGES}"
     )
@@ -314,14 +310,19 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
 
     translator = PDFTranslator(args.language, args.model)
-    data = translator.translate(args.pdf_path, show_progress=(not args.hide_progress), pages=args.pages)
+    doc, translations = translator.translate(args.pdf, show_progress=(not args.hide_progress), pages=args.pages)
 
     save_path = args.output
     if not save_path:
-        save_path = os.path.splitext(args.pdf_path)[0] + f"_{args.language}.pdf"
+        if args.pdf.startswith("http://") or args.pdf.startswith("https://"):
+            filename = args.pdf.split("/")[-1]
+        else:
+            filename = args.pdf
+
+        save_path = os.path.splitext(filename)[0] + f"_{args.language}.pdf"
 
     translator.save_to_pdf(
-        args.pdf_path, data, save_path, show_progress=(not args.hide_progress), jpeg_quality=args.jpeg_quality
+        doc, translations, save_path, show_progress=(not args.hide_progress), jpeg_quality=args.jpeg_quality
     )
 
     print(f"Translated PDF saved to '{save_path}'")
