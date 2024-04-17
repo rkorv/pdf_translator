@@ -39,6 +39,14 @@ python ./pdf_translator.py input.pdf de -o output.pdf
 This script will translate the input PDF file to the German language.
 Use following language codes: `ru`, `de`, `fr`, `es`, `it`, `pr`, `tr`.
 
+## Process URL directly
+
+```bash
+python ./pdf_translator.py "https://arxiv.org/pdf/2008.05711.pdf" es
+```
+
+This script will save translated file '2008.05711_es.pdf' in the current directory.
+
 ## Python API
 
 ```python
